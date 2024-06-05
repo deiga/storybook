@@ -28,21 +28,37 @@ export const exec = async (
 
   const defaultOptions: Options = {
     shell: true,
-    stdout: debug ? 'inherit' : 'pipe',
-    stderr: debug ? 'inherit' : 'pipe',
+    stdout: debug ? 'pipe' : 'ignore',
+    stderr: debug ? 'pipe' : 'ignore',
     signal,
   };
-  let currentChild: ExecaChildProcess<string>;
-
   try {
     if (typeof command === 'string') {
-      logger.debug(`> ${command}`);
-      currentChild = execa(command, { ...defaultOptions, ...options });
+      if (debug) {
+        logger.debug(`> ${command}`);
+      }
+      const [file, ...args] = command.split(' ');
+      const currentChild = execa(file, args, { ...defaultOptions, ...options });
+
+      if (debug) {
+        currentChild.stdout?.pipe(process.stdout);
+        currentChild.stderr?.pipe(process.stderr);
+      }
+
       await currentChild;
     } else {
       for (const subcommand of command) {
-        logger.debug(`> ${subcommand}`);
-        currentChild = execa(subcommand, { ...defaultOptions, ...options });
+        if (debug) {
+          logger.debug(`> ${subcommand}`);
+        }
+        const [file, ...args] = subcommand.split(' ');
+        const currentChild = execa(file, args, { ...defaultOptions, ...options });
+
+        if (debug) {
+          currentChild.stdout?.pipe(process.stdout);
+          currentChild.stderr?.pipe(process.stderr);
+        }
+
         await currentChild;
       }
     }

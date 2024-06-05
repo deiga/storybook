@@ -44,7 +44,7 @@ const run = async ({ cwd, flags }: { cwd: string; flags: string[] }) => {
   } = (await fs.readJson(join(cwd, 'package.json'))) as PackageJsonWithBundlerConfig;
 
   if (pre) {
-    await exec(`node -r ${__dirname}/../node_modules/esbuild-register/register.js ${pre}`, { cwd });
+    await exec(`bun ${pre}`, { cwd });
   }
 
   const reset = hasFlag(flags, 'reset');
@@ -93,24 +93,25 @@ const run = async ({ cwd, flags }: { cwd: string; flags: string[] }) => {
         outDir,
         sourcemap: false,
         format: ['esm'],
-        target: ['chrome100', 'safari15', 'firefox91'],
+        target: platform === 'node' ? ['node18'] : ['chrome100', 'safari15', 'firefox91'],
         clean: false,
         ...(dtsBuild === 'esm' ? dtsConfig : {}),
         platform: platform || 'browser',
-        esbuildPlugins: [
-          aliasPlugin({
-            process: path.resolve('../node_modules/process/browser.js'),
-            util: path.resolve('../node_modules/util/util.js'),
-          }),
-        ],
+        esbuildPlugins:
+          platform === 'node'
+            ? []
+            : [
+                aliasPlugin({
+                  process: path.resolve('../node_modules/process/browser.js'),
+                  util: path.resolve('../node_modules/util/util.js'),
+                }),
+              ],
         external: externals,
 
         esbuildOptions: (c) => {
-          /* eslint-disable no-param-reassign */
           c.conditions = ['module'];
           c.platform = platform || 'browser';
           Object.assign(c, getESBuildOptions(optimized));
-          /* eslint-enable no-param-reassign */
         },
       })
     );
@@ -133,10 +134,8 @@ const run = async ({ cwd, flags }: { cwd: string; flags: string[] }) => {
         external: externals,
 
         esbuildOptions: (c) => {
-          /* eslint-disable no-param-reassign */
           c.platform = 'node';
           Object.assign(c, getESBuildOptions(optimized));
-          /* eslint-enable no-param-reassign */
         },
       })
     );
@@ -149,11 +148,7 @@ const run = async ({ cwd, flags }: { cwd: string; flags: string[] }) => {
   await Promise.all(tasks);
 
   if (post) {
-    await exec(
-      `node -r ${__dirname}/../node_modules/esbuild-register/register.js ${post}`,
-      { cwd },
-      { debug: true }
-    );
+    await exec(`bun ${post}`, { cwd }, { debug: true });
   }
 
   if (process.env.CI !== 'true') {

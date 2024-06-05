@@ -66,6 +66,8 @@ orbs:
   browser-tools: circleci/browser-tools@1.4.1
   discord: antonioned/discord@0.1.0
   codecov: codecov/codecov@3.2.4
+  bun-orb: cmgriffing/bun-orb@0.0.28
+  node: circleci/node@5.2.0
   nx: nrwl/nx@1.6.2
 
 commands:
@@ -129,6 +131,9 @@ jobs:
     steps:
       - git-shallow-clone/checkout_advanced:
           clone_options: "--depth 1 --verbose"
+      - bun-orb/setup:
+          version: 1.1.1
+      - node/install
       - restore_cache:
           name: Restore Yarn cache
           keys:
@@ -189,6 +194,9 @@ jobs:
     steps:
       - git-shallow-clone/checkout_advanced:
           clone_options: "--depth 1 --verbose"
+      - bun-orb/setup:
+          version: 1.1.1
+      - node/install
       - attach_workspace:
           at: .
       - nx/set-shas:
@@ -339,23 +347,28 @@ jobs:
     steps:
       - git-shallow-clone/checkout_advanced:
           clone_options: "--depth 1 --verbose"
+      - bun-orb/setup:
+          version: 1.1.1
+      - node/install
       - attach_workspace:
           at: .
       - run:
           name: Starting Event Collector
-          command: node --loader esbuild-register/loader -r esbuild-register ./event-log-collector.ts
+          command: bun ./event-log-collector.ts
           working_directory: scripts
           background: true
       - run:
           name: Building Sandboxes
           command: yarn task --task build --template $(yarn get-template --cadence << pipeline.parameters.workflow >> --task build) --no-link --start-from=never --junit
+          environment:
+            STORYBOOK_TELEMETRY_URL: "http://localhost:6007/event-log"
       - run:
           name: Verifying Telemetry
           command: |
             TEMPLATE=$(yarn get-template --cadence << pipeline.parameters.workflow >> --task build)
             if [[ $TEMPLATE != bench/* ]]
             then
-              node --loader esbuild-register/loader -r esbuild-register ./event-log-checker build $TEMPLATE
+              bun ./event-log-checker.ts build $TEMPLATE
             fi
           working_directory: scripts
       - report-workflow-on-failure:

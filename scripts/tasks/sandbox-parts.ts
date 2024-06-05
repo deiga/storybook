@@ -2,7 +2,6 @@
 // the repo to work properly. So we load it async in the task runner *after* those steps.
 
 import {
-  copy,
   ensureSymlink,
   ensureDir,
   existsSync,
@@ -11,6 +10,7 @@ import {
   readJson,
   writeJson,
 } from 'fs-extra';
+import fs from 'fs/promises';
 import { join, resolve, sep } from 'path';
 import JSON5 from 'json5';
 import { createRequire } from 'module';
@@ -66,7 +66,7 @@ export const create: Task['run'] = async ({ key, template, sandboxDir }, { dryRu
     if (!existsSync(srcDir)) {
       throw new Error(`Missing repro directory '${srcDir}', did the generate task run?`);
     }
-    await copy(srcDir, sandboxDir);
+    await fs.cp(srcDir, sandboxDir, { recursive: true, mode: fs.constants.COPYFILE_FICLONE });
   } else {
     await executeCLIStep(steps.repro, {
       argument: key,
@@ -386,7 +386,7 @@ export const addStories: Task['run'] = async (
   { sandboxDir, template, key },
   { addon: extraAddons, disableDocs }
 ) => {
-  logger.log('💃 adding stories');
+  logger.log('💃 Adding stories');
   const cwd = sandboxDir;
   const storiesPath = await findFirstPath([join('src', 'stories'), 'stories'], { cwd });
 
@@ -641,8 +641,7 @@ async function prepareAngularSandbox(cwd: string, templateName: string) {
 
   packageJson.scripts = {
     ...packageJson.scripts,
-    'docs:json':
-      'DIR=$PWD; cd ../../scripts; node --loader esbuild-register/loader -r esbuild-register combine-compodoc $DIR',
+    'docs:json': 'DIR=$PWD; cd ../../scripts; bun combine-compodoc $DIR',
     storybook: `yarn docs:json && ${packageJson.scripts.storybook}`,
     'build-storybook': `yarn docs:json && ${packageJson.scripts['build-storybook']}`,
   };
